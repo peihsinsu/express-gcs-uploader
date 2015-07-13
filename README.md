@@ -2,6 +2,8 @@
 
 This is a express upload plugin that will sync the upload data with Google Cloud Storage.
 
+![Express GCS Uploader](images/express-gcs-uploader.png)
+
 ## Installation
 
 ```
