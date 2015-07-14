@@ -1,6 +1,6 @@
 {
   "name": "express-gcs-uploader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -10,6 +10,6 @@
   "dependencies": {
     "gcloud": "^0.16.0",
     "multer": "^0.1.8",
-    "nodeutil": "0.0.46"
+    "nodeutil": "0.0.47"
   }
 }
