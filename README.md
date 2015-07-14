@@ -1,8 +1,14 @@
 # Express GCS Uploader
 
-This is a express upload plugin that will sync the upload data with Google Cloud Storage.
+This is a express upload plugin that will auto copy the upload data to Google Cloud Storage. And also have a download strategy for choice: 
+
+* Download from local if local have the file
+* Download from GCS directly
+* Download from GCS and cache to local
 
 ![Express GCS Uploader](images/express-gcs-uploader.png)
+
+Note: All the service is base on [multr](https://github.com/expressjs/multer), if you want to add more into the option, you can reference to multr's option.
 
 ## Installation
 
