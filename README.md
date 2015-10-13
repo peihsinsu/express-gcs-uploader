@@ -63,4 +63,27 @@ If you want use the "cdn_url" to let cloud storage web site bucket can be your C
 gsutil defacl ch  -p allUsers:R gs://your.bucket.com.tw
 ```
 
+## Test upload
 
+Make a route for receive upload
+
+```
+router.post('/uploadtest', function(req, res, next) {
+  res.end('done...');
+});
+```
+
+Upload using curl:
+
+```
+curl -F "image=@/Users/peihsinsu/Pictures/pic2.png" http://localhost:3000/uploadtest -X POST
+```
+
+Upload using upload form:
+
+```
+<form method="post" action="/uploadtest" name="submit" enctype="multipart/form-data">
+  <input type="file" name="fileField"><br /><br />
+  <input type="submit" name="submit" value="Submit">
+</form>
+```
