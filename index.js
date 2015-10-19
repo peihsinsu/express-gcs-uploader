@@ -5,7 +5,7 @@ var log = require('nodeutil').simplelog;
 // var gcs;
 var module_opts = {};
 var sep = require('path').sep;
-var mine = require('mine');
+var mime = require('mime');
 var auth = require('google-api-utility')
   , request = auth.request
   , util = require('util')
@@ -25,7 +25,7 @@ exports.auth = function(opts) {
 	// });
 	auth.init({
 	  scope: 'https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/devstorage.read_write https://www.googleapis.com/auth/cloud-platform',
-	  json_file: '/Users/peihsinsu/.gcpkeys/itri-smart-home/itri-smart-home-33f5a755a360.json'
+	  json_file: opts.keyFilename
 	});
 }
 
@@ -110,6 +110,7 @@ exports.downloadproxy = function(req, res, next) {
 }
 
 function uploadGcs(bucket, filepath, finalname, callback) {
+	log.trace('Upload info: bucket=%s, filepath=%s, finalname=%s', bucket, filepath, finalname);
   request({
 		url: util.format('https://www.googleapis.com/upload/storage/v1/b/%s/o', bucket),
 	  method: 'POST',
@@ -117,7 +118,7 @@ function uploadGcs(bucket, filepath, finalname, callback) {
 	  postambleCRLF: true,
 	  multipart: [
 	    { 'Content-Type':'application/json', body: JSON.stringify({name: finalname}) },
-	    { 'Content-Type': mine.lookup(filepath), body: fs.readFileSync(filepath) }
+	    { 'Content-Type': mime.lookup(filepath), body: fs.readFileSync(filepath) }
 	  ]
 	}, callback);
 }

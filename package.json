@@ -1,6 +1,6 @@
 {
   "name": "express-gcs-uploader",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "main": "index.js",
   "scripts": {},
@@ -8,7 +8,7 @@
   "license": "ISC",
   "dependencies": {
     "google-api-utility": "0.0.10",
-    "mine": "^0.1.0",
+    "mime": "^1.3.4",
     "multer": "^0.1.8",
     "nodeutil": "0.0.47"
   }
