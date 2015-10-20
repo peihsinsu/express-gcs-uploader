@@ -1,17 +1,17 @@
-var fs = require('fs');
-var multer = require('multer');
-//var gcloud = require('gcloud');
-var log = require('nodeutil').simplelog;
-// var gcs;
-var module_opts = {};
-var sep = require('path').sep;
-var mime = require('mime');
-var auth = require('google-api-utility')
+var fs = require('fs')
+	, multer = require('multer')
+	, log = require('nodeutil').simplelog
+	, module_opts = {}
+	, sep = require('path').sep
+	, mime = require('mime')
+	, auth = require('google-api-utility')
   , request = auth.request
   , util = require('util')
   , fs = require('fs')
+  , mkdirp = require('mkdirp');
 
-//if(process.env.LOG_LEVEL) log.setLevel('TRACE');
+//Default log level to debug
+log.setLevel(process.env.LOG_LEVEL || 'DEBUG');
 
 exports.auth = function(opts) {
 	if(!opts) throw "no auth configured...";
@@ -19,10 +19,6 @@ exports.auth = function(opts) {
 	if(!opts.keyFilename) throw "np keyFilename...";
 
   module_opts = opts;
-	// gcs = gcloud.storage({
-	// 	projectId: opts.projectId,
-	// 	keyFilename: opts.keyFilename
-	// });
 	auth.init({
 	  scope: 'https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/devstorage.read_write https://www.googleapis.com/auth/cloud-platform',
 	  json_file: opts.keyFilename
@@ -34,11 +30,6 @@ exports.init = function(opts) {
     opts['onFileUploadComplete'] = function(file, req, res) {
 			if(module_opts.bucket) {
 				log.trace('Saving data to google cloud storage...');
-				/*
-				var bucket = gcs.bucket(module_opts.bucket);
-				var fileStream = fs.createReadStream(module_opts.rootdir + sep + file.path);
-				fileStream.pipe(bucket.file(module_opts.keep_filename ? file.originalname : file.name).createWriteStream());
-				*/
 				uploadGcs(module_opts.bucket, 
 						module_opts.rootdir + sep + file.path, 
 						module_opts.keep_filename ? file.originalname : file.name,
@@ -49,11 +40,11 @@ exports.init = function(opts) {
 							//Rename file process
 							if(module_opts.keep_filename) {
 								log.trace('try to rename local filename from %s to %s',
-										module_opts.rootdir + sep + module_opts.upload_url + sep + file.name,
-										module_opts.rootdir + sep + module_opts.upload_url + sep + file.originalname);
+										module_opts.rootdir + module_opts.upload_url + sep + file.name,
+										module_opts.rootdir + module_opts.upload_url + sep + file.originalname);
 
-								fs.rename(module_opts.rootdir + sep + module_opts.upload_url + sep + file.name, 
-									module_opts.rootdir + sep + module_opts.upload_url + sep + file.originalname, 
+								fs.rename(module_opts.rootdir + module_opts.upload_url + sep + file.name, 
+									module_opts.rootdir + module_opts.upload_url + sep + file.originalname, 
 									function(err){
 											if(err) log.error('rename file error:', err);
 								});
@@ -69,37 +60,77 @@ exports.init = function(opts) {
 }
 
 exports.downloadproxy = function(req, res, next) {
+	var path = req.originalUrl;
+	var patharr = path.split('/');
+	patharr.shift();
+	patharr.shift()
+
+	path = patharr.join('/');
+
+	req.params.id = path;
+
   if(req.params.id) {
+		//If CDN setting is true, using CDN directly
     if(module_opts.cdn_url) {
 			log.trace('response from cdn url: ', module_opts.cdn_url + sep + req.params.id);
       res.redirect(module_opts.cdn_url + sep + req.params.id);
 	  }
-	 	if(fs.existsSync(module_opts.rootdir + sep + module_opts.upload_url + sep + req.params.id)) {
-			log.trace('Using local file: %s', module_opts.rootdir + sep + module_opts.upload_url + sep + req.params.id);
-		  var fileStream = fs.createReadStream(module_opts.rootdir + sep + module_opts.upload_url + sep + req.params.id);
-			fileStream.pipe(res);
-		} else {
-			log.trace('Using gcs file');
 
-			//var bucket = gcs.bucket(module_opts.bucket);
-			//var fileStream = bucket.file(req.params.id).createReadStream();
-			getDownloadInfo(module_opts.bucket, req.params.id, function(e,r,d){
+		//If local file exist, using local response
+		else if(fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id)) {
+			log.trace('Using local file: %s', module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
+		  var fileStream = fs.createReadStream(module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
+			fileStream.pipe(res);
+		} 
+		
+		//If no CDN, no local, then use GCS for response
+		else {
+			log.trace('Using gcs file...');
+
+			getDownloadInfo(module_opts.bucket, encodeURIComponent(req.params.id), function(e,r,d){
 				if(module_opts.cache) {
 					log.trace('Caching file to %s',
-							module_opts.rootdir + sep + module_opts.upload_url + sep + req.params.id);
-					if(typeof(d) != 'object') d = JSON.parse(d);
+							module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
 
+					if(e) {
+						log.error('Get metadata error:', e);
+					}
+
+					log.info("got result:", d);
+					log.info("got result type:", typeof(d));
+
+					if(!d) {
+						log.info('do sent...');
+						return res.status(404).send({"code": 404, "msg": "file not found"});
+					} 
+
+					if(typeof(d) != 'object') d = JSON.parse(d);
+					log.info('do else...');
+
+					if(!d['mediaLink']) {
+						return res.status(404).send({"code": 404, "msg": "response api not correct"});
+					}
+
+					//Checking and create path folder
+					var path = module_opts.rootdir + module_opts.upload_url + sep + req.params.id;
+					var tmpArr = path.split('/');
+					tmpArr.pop()
+					var fpath = tmpArr.join('/');
+					log.trace('>>>>>>>>mkdir for %s', fpath);
+					mkdirp.sync(fpath);
+
+				  //Download from GCS and also sync to folder	
 					auth.requestDownload({
 						url: d.mediaLink,
 						method: 'GET'
-					}, 
-					module_opts.rootdir + sep + module_opts.upload_url + sep + req.params.id , 
+					},
+				  path,	
 					function(e,r,d){
-				    if(e) 
-							log.error('request gcs file error...');
-						res.pipe(
-							fs.createReadStream(module_opts.rootdir + sep + module_opts.upload_url + sep + req.params.id));	
+						if(e) 
+							log.error('request gcs file error...', e);
+					  res.pipe(fs.createReadStream(path));	
 					});
+					
 				}
 			});
 			
@@ -124,6 +155,7 @@ function uploadGcs(bucket, filepath, finalname, callback) {
 }
 
 function getDownloadInfo(bucket, filename, callback) {
+	log.trace('Get from GCS bucket:%s, filename:%s', bucket, filename);
   var downloadUrl = 'https://www.googleapis.com/storage/v1/b/%s/o/%s';
 	request({
 		url: util.format(downloadUrl, bucket, filename),
