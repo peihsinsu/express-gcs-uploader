@@ -1,7 +1,7 @@
 var fs = require('fs')
-	, multer = require('multer')
-	, log = require('nodeutil').simplelog
-	, module_opts = {}
+  , multer = require('multer')
+  , log = require('nodeutil').simplelog
+  , module_opts = {}
 	, sep = require('path').sep
 	, mime = require('mime')
 	, auth = require('google-api-utility')
@@ -68,6 +68,7 @@ exports.downloadproxy = function(req, res, next) {
 	path = patharr.join('/');
 
 	req.params.id = path;
+	log.info('Download proxy: ', req.params.id);
 
   if(req.params.id) {
 		//If CDN setting is true, using CDN directly
@@ -116,7 +117,7 @@ exports.downloadproxy = function(req, res, next) {
 					var tmpArr = path.split('/');
 					tmpArr.pop()
 					var fpath = tmpArr.join('/');
-					log.trace('>>>>>>>>mkdir for %s', fpath);
+					log.trace('mkdir for %s', fpath);
 					mkdirp.sync(fpath);
 
 				  //Download from GCS and also sync to folder	
