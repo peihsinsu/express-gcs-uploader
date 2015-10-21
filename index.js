@@ -68,17 +68,21 @@ exports.downloadproxy = function(req, res, next) {
 	path = patharr.join('/');
 
 	req.params.id = path;
-	log.info('Download proxy: ', req.params.id);
+	log.trace('Download proxy: ', req.params.id);
 
   if(req.params.id) {
 		//If CDN setting is true, using CDN directly
     if(module_opts.cdn_url) {
 			log.trace('response from cdn url: ', module_opts.cdn_url + sep + req.params.id);
-      res.redirect(module_opts.cdn_url + sep + req.params.id);
+      return res.redirect(module_opts.cdn_url + sep + req.params.id);
 	  }
 
+	  log.trace('Checking path: %s, result:%s', 
+			module_opts.rootdir + module_opts.upload_url + sep + req.params.id,
+			fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id));
+
 		//If local file exist, using local response
-		else if(fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id)) {
+		if(fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id)) {
 			log.trace('Using local file: %s', module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
 		  var fileStream = fs.createReadStream(module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
 			fileStream.pipe(res);
@@ -106,9 +110,11 @@ exports.downloadproxy = function(req, res, next) {
 					} 
 
 					if(typeof(d) != 'object') d = JSON.parse(d);
+
 					log.info('do else...');
 
 					if(!d['mediaLink']) {
+						log.error("response api not correct, d=", d);
 						return res.status(404).send({"code": 404, "msg": "response api not correct"});
 					}
 
@@ -126,10 +132,9 @@ exports.downloadproxy = function(req, res, next) {
 						method: 'GET'
 					},
 				  path,	
-					function(e,r,d){
-						if(e) 
-							log.error('request gcs file error...', e);
-					  res.pipe(fs.createReadStream(path));	
+					function(request){
+						log.trace('Start to process download and response....');
+						request.pipe(res).pipe(fs.createWriteStream(path));
 					});
 					
 				}

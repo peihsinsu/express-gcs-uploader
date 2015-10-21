@@ -8,7 +8,7 @@
   "license": "ISC",
   "github": "https://github.com/peihsinsu/express-gcs-uploader",
   "dependencies": {
-    "google-api-utility": "0.0.10",
+    "google-api-utility": "*",
     "mime": "^1.3.4",
     "mkdirp": "^0.5.1",
     "multer": "^0.1.8",
