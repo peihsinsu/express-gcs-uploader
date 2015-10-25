@@ -144,6 +144,7 @@ exports.downloadproxy = function(req, res, next) {
 						//TODO: trigger to another process, check file complete before download
 						//TODO: do checksum, then move file to path
 						var tmpFolder = module_opts['tmpFolder'];
+						mkdirp.sync(tmpFolder);
 						var tmpFile = tmpFolder + sep + req.params.id;
 						log.trace('tmpFile is:', tmpFile);
 						if( tmpFolder ) {
