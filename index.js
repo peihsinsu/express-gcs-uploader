@@ -8,7 +8,8 @@ var fs = require('fs')
   , request = auth.request
   , util = require('util')
   , fs = require('fs')
-  , mkdirp = require('mkdirp');
+  , mkdirp = require('mkdirp')
+  , checker = require('./lib/checker');
 
 //Default log level to debug
 log.setLevel(process.env.LOG_LEVEL || 'DEBUG');
@@ -20,7 +21,10 @@ exports.auth = function(opts) {
 
   module_opts = opts;
 	auth.init({
-	  scope: 'https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/devstorage.read_write https://www.googleapis.com/auth/cloud-platform',
+	  scope: 
+	  	['https://www.googleapis.com/auth/devstorage.full_control',
+	  		'https://www.googleapis.com/auth/devstorage.read_write',
+	  		'https://www.googleapis.com/auth/cloud-platform'].join(' '),
 	  json_file: opts.keyFilename
 	});
 }
@@ -70,6 +74,9 @@ exports.downloadproxy = function(req, res, next) {
 	req.params.id = path;
 	log.trace('Download proxy: ', req.params.id);
 
+	var filepath = module_opts.rootdir + module_opts.upload_url + sep + req.params.id;
+	log.trace('File path will be:', filepath);
+
   if(req.params.id) {
 		//If CDN setting is true, using CDN directly
     if(module_opts.cdn_url) {
@@ -77,14 +84,15 @@ exports.downloadproxy = function(req, res, next) {
       return res.redirect(module_opts.cdn_url + sep + req.params.id);
 	  }
 
-	  log.trace('Checking path: %s, result:%s', 
-			module_opts.rootdir + module_opts.upload_url + sep + req.params.id,
-			fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id));
+	  log.trace('Checking file exist of not: %s, result:%s', 
+			filepath,
+			fs.existsSync(filepath));
 
 		//If local file exist, using local response
-		if(fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id)) {
-			log.trace('Using local file: %s', module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
-		  var fileStream = fs.createReadStream(module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
+		//if(fs.existsSync(module_opts.rootdir + module_opts.upload_url + sep + req.params.id)) {
+		if(fs.existsSync(filepath)) {
+			log.trace('Using local file: %s', filepath); //module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
+		  var fileStream = fs.createReadStream(filepath); //module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
 			fileStream.pipe(res);
 		} 
 		
@@ -94,15 +102,14 @@ exports.downloadproxy = function(req, res, next) {
 
 			getDownloadInfo(module_opts.bucket, encodeURIComponent(req.params.id), function(e,r,d){
 				if(module_opts.cache) {
-					log.trace('Caching file to %s',
-							module_opts.rootdir + module_opts.upload_url + sep + req.params.id);
+					log.trace('Try to cache file to %s', filepath);
 
 					if(e) {
 						log.error('Get metadata error:', e);
 					}
 
-					log.info("got result:", d);
-					log.info("got result type:", typeof(d));
+					log.trace("got result:", d);
+					log.trace("got result type:", typeof(d));
 
 					if(!d) {
 						log.info('do sent...');
@@ -119,22 +126,59 @@ exports.downloadproxy = function(req, res, next) {
 					}
 
 					//Checking and create path folder
-					var path = module_opts.rootdir + module_opts.upload_url + sep + req.params.id;
-					var tmpArr = path.split('/');
+					var tmpArr = filepath.split('/');
 					tmpArr.pop()
 					var fpath = tmpArr.join('/');
 					log.trace('mkdir for %s', fpath);
 					mkdirp.sync(fpath);
 
 				  //Download from GCS and also sync to folder	
-					auth.requestDownload({
+					auth.getRequest({
 						url: d.mediaLink,
 						method: 'GET'
 					},
-				  path,	
 					function(request){
 						log.trace('Start to process download and response....');
-						request.pipe(res).pipe(fs.createWriteStream(path));
+						request.pipe(res);
+
+						//TODO: trigger to another process, check file complete before download
+						//TODO: do checksum, then move file to path
+						var tmpFolder = module_opts['tmpFolder'];
+						var tmpFile = tmpFolder + sep + req.params.id;
+						log.trace('tmpFile is:', tmpFile);
+						if( tmpFolder ) {
+							log.trace("write file to tmp folder...");
+							
+							//Step1: Clear file fist
+							log.trace("cleaning tmpFile: ", tmpFile);
+							if(fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+
+							//Step2: Write to tmp folder
+							log.trace("write request to file...");
+							request.pipe(fs.createWriteStream(tmpFile))
+							request.on('end', function(){
+							  log.trace('Create file:%s end....', tmpFile);
+								//Step3: Chekcsum and move to real path
+								checker.md5hash(tmpFile, function(err, md5){
+									log.trace("file:%s, md5:%s", tmpFile, md5);
+									if(err) 
+										log.error("checking file (%s) with md5 error...", tmpFile);
+									else
+										if(md5 == d['md5Hash']) { //checksum success
+											log.trace('md5 create success, move file from %s to %s', tmpFile, filepath);
+											fs.renameSync(tmpFile, filepath);
+										} else { //error process, delete the tmp file when checksum error
+											log.trace('md5 check error, will delete tmp file:%s', tmpFile);
+											//fs.unlink(tmpFile);
+										}
+								});
+							});
+
+						} else {
+							log.trace("directly response...");
+							request.pipe(fs.createWriteStream(filepath));
+						}
+
 					});
 					
 				}
