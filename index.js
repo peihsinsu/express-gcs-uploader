@@ -101,7 +101,7 @@ exports.downloadproxy = function(req, res, next) {
 			log.trace('Using gcs file...');
 
 			getDownloadInfo(module_opts.bucket, encodeURIComponent(req.params.id), function(e,r,d){
-				if(module_opts.cache) {
+				// if(module_opts.cache) {
 					log.trace('Try to cache file to %s', filepath);
 
 					if(e) {
@@ -154,9 +154,14 @@ exports.downloadproxy = function(req, res, next) {
 							log.trace("cleaning tmpFile: ", tmpFile);
 							if(fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
 
-							//Step2: Write to tmp folder
+							//Step2: Response to client & Write to tmp folder
 							log.trace("write request to file...");
-							request.pipe(fs.createWriteStream(tmpFile))
+
+							//Step2-1: Response to client
+							request.pipe(fs.createWriteStream(tmpFile));
+
+							//Step2-2: Write to tmp folder
+							if(module_opts.cache) 
 							request.on('end', function(){
 							  log.trace('Create file:%s end....', tmpFile);
 								//Step3: Chekcsum and move to real path
@@ -182,7 +187,7 @@ exports.downloadproxy = function(req, res, next) {
 
 					});
 					
-				}
+				// }
 			});
 			
 		}
