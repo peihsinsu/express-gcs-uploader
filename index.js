@@ -12,6 +12,7 @@ var fs = require('fs')
   , checker = require('./lib/checker');
 
 //Default log level to debug
+console.log('Using LOG_LEVEL=', process.env.LOG_LEVEL);
 log.setLevel(process.env.LOG_LEVEL || 'DEBUG');
 
 exports.auth = function(opts) {
@@ -68,8 +69,8 @@ exports.downloadproxy = function(req, res, next) {
 	var patharr = path.split('/');
 	patharr.shift();
 	patharr.shift()
-
-	path = patharr.join('/');
+	urlpath = patharr.join('/');
+	path = patharr.join(sep);
 
 	req.params.id = path;
 	log.trace('Download proxy: ', req.params.id);
@@ -98,9 +99,9 @@ exports.downloadproxy = function(req, res, next) {
 		
 		//If no CDN, no local, then use GCS for response
 		else {
-			log.trace('Using gcs file...');
+			log.trace('Download gcs path -> gs://%s/%s', module_opts.bucket, urlpath);
 
-			getDownloadInfo(module_opts.bucket, encodeURIComponent(req.params.id), function(e,r,d){
+			getDownloadInfo(module_opts.bucket, encodeURIComponent(urlpath), function(e,r,d){
 				// if(module_opts.cache) {
 					log.trace('Try to cache file to %s', filepath);
 
@@ -118,7 +119,7 @@ exports.downloadproxy = function(req, res, next) {
 
 					if(typeof(d) != 'object') d = JSON.parse(d);
 
-					log.info('do else...');
+					log.info('do else...d=', d);
 
 					if(!d['mediaLink']) {
 						log.error("response api not correct, d=", d);
@@ -126,9 +127,9 @@ exports.downloadproxy = function(req, res, next) {
 					}
 
 					//Checking and create path folder
-					var tmpArr = filepath.split('/');
+					var tmpArr = filepath.split(sep);
 					tmpArr.pop()
-					var fpath = tmpArr.join('/');
+					var fpath = tmpArr.join(sep);
 					log.trace('mkdir for %s', fpath);
 					mkdirp.sync(fpath);
 
@@ -144,9 +145,18 @@ exports.downloadproxy = function(req, res, next) {
 						//TODO: trigger to another process, check file complete before download
 						//TODO: do checksum, then move file to path
 						var tmpFolder = module_opts['tmpFolder'];
-						mkdirp.sync(tmpFolder);
+						// mkdirp.sync(tmpFolder);
+						// log.trace('creating tmp folder:', tmpFolder);
+
 						var tmpFile = tmpFolder + sep + req.params.id;
+						var tmpArr = tmpFile.split(sep);
+						tmpArr.pop();
+						var tfpath = tmpArr.join(sep);
+						log.trace('mkdir for %s', tfpath);
+						mkdirp.sync(tfpath);
+
 						log.trace('tmpFile is:', tmpFile);
+						
 						if( tmpFolder ) {
 							log.trace("write file to tmp folder...");
 							
