@@ -75,6 +75,12 @@ exports.downloadproxy = function(req, res, next) {
 	req.params.id = path;
 	log.trace('Download proxy: ', req.params.id);
 
+	//For Safari specific.... to set header Content-Type: application/x-mpegurl
+	if(req.params.id && req.params.id.indexOf("m3u8") > 0) {
+		log.info("setup header...");
+		res.setHeader('content-type', 'application/x-mpegurl');
+	}
+
 	var filepath = module_opts.rootdir + module_opts.upload_url + sep + req.params.id;
 	log.trace('File path will be:', filepath);
 
