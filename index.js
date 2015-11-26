@@ -9,6 +9,7 @@ var fs = require('fs')
   , util = require('util')
   , fs = require('fs')
   , mkdirp = require('mkdirp')
+  , _ = require('underscore')
   , checker = require('./lib/checker');
 
 //Default log level to debug
@@ -77,7 +78,7 @@ exports.downloadproxy = function(req, res, next) {
 
 	//For Safari specific.... to set header Content-Type: application/x-mpegurl
 	if(req.params.id && req.params.id.indexOf("m3u8") > 0) {
-		log.info("setup header...");
+		log.trace("setup header...");
 		res.setHeader('content-type', 'application/x-mpegurl');
 	}
 
@@ -146,7 +147,18 @@ exports.downloadproxy = function(req, res, next) {
 					},
 					function(request){
 						log.trace('Start to process download and response....');
-						request.pipe(res);
+						var _request = _.clone(request);
+
+						if(req.params.id && req.params.id.indexOf("m3u8") > 0) {
+							var out_data = '';
+							_request.on('data', function(data){
+								out_data += data;
+							}).on('end', function(){
+								res.end(out_data);
+							});
+						} else {
+							_request.pipe(res);
+						}
 
 						//TODO: trigger to another process, check file complete before download
 						//TODO: do checksum, then move file to path
