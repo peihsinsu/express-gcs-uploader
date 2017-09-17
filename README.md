@@ -26,6 +26,7 @@ gcsuplder.auth({
   rootdir: __dirname,
   upload_url: '/uploads',
   download_url: '/download',
+  tmpFolder: '/tmp', 
   cdn_url: 'http://your.bucket.com.tw', //option: for gcs public read or something like that
   keep_filename: true, //option: use for keep the original file name in the remote
   cache: true, //option: will write to local everytime when read from gcs
@@ -40,6 +41,7 @@ The configuration detail describe below:
 * rootdir (string): The project root path.
 * upload_url (string): The upload folder path.
 * download_url (string): The download url.
+* tmpFolder (string): The tmp folder for store the object.
 * cdn_url (string): The cache url, like CDN path or your cloud storage web site bucket path.
 * keep_filename (boolean): If you want to keep the filename, use true for rename the random filename to yours. 
 * cache (boolean): If you want to cache the data to local that read from gcs, use true...
@@ -77,6 +79,13 @@ Upload using curl:
 
 ```
 curl -F "image=@/Users/peihsinsu/Pictures/pic2.png" http://localhost:3000/uploadtest -X POST
+```
+
+
+Upload using curl with subfolder:
+
+```
+curl -F "image=@/Users/peihsinsu/Pictures/pic2.png" http://localhost:3000/uploadtest -X POST -H 'subfolder:myfolder'
 ```
 
 Upload using upload form:

@@ -35,13 +35,16 @@ exports.init = function(opts) {
     if (opts && !opts['onFileUploadComplete']) {
         opts['onFileUploadComplete'] = function(file, req, res) {
 
-            console.log('>>>>>>>>>>>', req.body.new_path);
+            log.trace('Got file path:', req.headers['subfolder']);
+            //if new path exist, define the subfolder
+            var subfolder = req.headers['subfolder'] ? req.headers['subfolder'] + sep : '';
+            log.trace('Got subfolder:', subfolder);
 
             if (module_opts.bucket) {
                 log.trace('Saving data to google cloud storage...');
                 uploadGcs(module_opts.bucket,
                     module_opts.rootdir + sep + file.path,
-                    module_opts.keep_filename ? file.originalname : file.name,
+                    subfolder + (module_opts.keep_filename ? file.originalname : file.name),
                     function(e, r, d) {
                         if (e) log.error('upload GCS error: ', e);
                         log.trace('upload file to GCS success: ', d);
