@@ -34,6 +34,9 @@ exports.auth = function(opts) {
 exports.init = function(opts) {
     if (opts && !opts['onFileUploadComplete']) {
         opts['onFileUploadComplete'] = function(file, req, res) {
+
+            console.log('>>>>>>>>>>>', req.body.new_path);
+
             if (module_opts.bucket) {
                 log.trace('Saving data to google cloud storage...');
                 uploadGcs(module_opts.bucket,
@@ -92,7 +95,7 @@ exports.downloadproxy = function(req, res, next) {
             return res.redirect(module_opts.cdn_url + sep + req.params.id);
         }
 
-        log.trace('Checking file exist of not: %s, result:%s',
+        log.trace('Checking file exist or not: %s, result:%s',
             filepath,
             fs.existsSync(filepath));
 
@@ -157,7 +160,7 @@ exports.downloadproxy = function(req, res, next) {
                                 res.end(out_data);
                             });
                         } else {
-                            _request.pipe(res);
+                            // _request.pipe(res);
                         }
 
                         //TODO: trigger to another process, check file complete before download
@@ -184,10 +187,19 @@ exports.downloadproxy = function(req, res, next) {
 
                             //Step2: Response to client & Write to tmp folder
                             log.trace("write request to file...");
-
-                            //Step2-1: Response to client
                             request.pipe(fs.createWriteStream(tmpFile));
 
+                            
+                            
+                            //Step2-1: Response to client
+                            request.on('complete', function(response) {
+                                log.trace('download complete, code:', response.statusCode) // 200
+                                log.trace('object content-type:', response.headers['content-type']) // 'image/png'
+
+                                res.redirect( module_opts['download_url'] + '/' + req.params.id);
+                              });                            
+                            
+                            
                             //Step2-2: Write to tmp folder
                             if (module_opts.cache)
                                 request.on('end', function() {
@@ -210,7 +222,9 @@ exports.downloadproxy = function(req, res, next) {
 
                         } else {
                             log.trace("directly response...");
-                            request.pipe(fs.createWriteStream(filepath));
+                            
+                            //TODO: solve the always download issue
+                            request.pipe(res);
                         }
 
                     });
